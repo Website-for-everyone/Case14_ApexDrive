@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Drive | Supercar Telemetry & Rental Cockpit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-carbon: #0c0d10;
+      --bg-panel: #14161d;
+      --tacho-red: #ff1801;
+      --telemetry-green: #00e676;
+      --titanium: #e0e0e0;
+      --text-muted: #838a9a;
+      --border-hud: rgba(255, 24, 1, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-carbon);
+      color: var(--titanium);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(255, 24, 1, 0.12) 0%, transparent 60%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0, rgba(255,255,255,0.015) 2px, transparent 0, transparent 8px);
+    }
+
+    /* Top HUD Header */
+    header {
+      padding: 1rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(12, 13, 16, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-hud);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+
+    .brand-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: #fff;
+    }
+
+    .brand-title span {
+      color: var(--tacho-red);
+      text-shadow: 0 0 15px rgba(255, 24, 1, 0.6);
+    }
+
+    .telemetry-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--telemetry-green);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--telemetry-green);
+      box-shadow: 0 0 10px var(--telemetry-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Fleet Selector Carousel */
+    .fleet-tabs {
+      display: flex;
+      gap: 0.8rem;
+      padding: 1.5rem 2.5rem 0.5rem;
+      overflow-x: auto;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    .car-tab-btn {
+      background: var(--bg-panel);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--titanium);
+      padding: 0.8rem 1.4rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: all 0.25s ease;
+    }
+
+    .car-tab-btn:hover, .car-tab-btn.active {
+      border-color: var(--tacho-red);
+      background: rgba(255, 24, 1, 0.15);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(255, 24, 1, 0.3);
+      transform: translateY(-2px);
+    }
+
+    /* Cockpit Main Layout */
+    .cockpit-grid {
+      max-width: 1440px;
+      margin: 1.5rem auto 3rem;
+      padding: 0 2rem;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1080px) {
+      .cockpit-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Cockpit Panels */
+    .telemetry-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .hud-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-hud);
+      border-radius: 12px;
+      padding: 1.8rem;
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.6);
+      position: relative;
+    }
+
+    .car-hero-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+    }
+
+    .car-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #fff;
+    }
+
+    .car-engine-badge {
+      font-size: 0.95rem;
+      color: var(--tacho-red);
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    /* Live Tachometer & Soundboard Area */
+    .gauges-row {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .gauges-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Tachometer SVG */
+    .tachometer-wrapper {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      margin: 0 auto;
+    }
+
+    .rev-needle {
+      transform-origin: 130px 130px;
+      transition: transform 0.15s cubic-bezier(0.1, 0.9, 0.2, 1);
+    }
+
+    .rev-button-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    .btn-rev {
+      background: linear-gradient(135deg, var(--tacho-red), #990000);
+      color: #fff;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      padding: 1.1rem 2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(255, 24, 1, 0.4);
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+
+    .btn-rev:hover {
+      box-shadow: 0 0 35px rgba(255, 24, 1, 0.8);
+      transform: scale(1.02);
+    }
+
+    .btn-rev:active {
+      transform: scale(0.98);
+    }
+
+    /* Acceleration & Dyno Telemetry */
+    .dyno-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .dyno-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .dyno-card {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .dyno-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .dyno-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 0.2rem;
+    }
+
+    .dyno-value span {
+      font-size: 0.9rem;
+      color: var(--tacho-red);
+    }
+
+    /* Right Calculator Panel */
+    .calc-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-hud);
+      border-radius: 12px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .calc-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .form-group input, .form-group select {
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      padding: 0.75rem;
+      color: #fff;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--tacho-red);
+      outline: none;
+      box-shadow: 0 0 10px rgba(255, 24, 1, 0.4);
+    }
+
+    /* Pricing Summary Box */
+    .summary-box {
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,24,1,0.3);
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: var(--titanium);
+    }
+
+    .summary-row.total {
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 0.6rem;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .btn-rent {
+      background: var(--telemetry-green);
+      color: #000;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: 1rem;
+      letter-spacing: 1.5px;
+      padding: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .btn-rent:hover {
+      background: #00ff88;
+      box-shadow: 0 0 25px rgba(0, 230, 118, 0.6);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-title">APEX<span>DRIVE</span></div>
+      <div style="font-size: 0.8rem; letter-spacing: 3px; color: var(--text-muted); text-transform: uppercase;">Supercar Telemetry Club</div>
+    </div>
+    <div class="telemetry-status">
+      <div class="status-dot"></div>
+      <span>Telemetry Live Link • Ready</span>
+    </div>
+  </header>
+
+  <!-- Fleet Carousel Tabs -->
+  <div class="fleet-tabs" id="fleetTabs">
+    <!-- Populated via JS -->
+  </div>
+
+  <!-- Cockpit Grid -->
+  <main class="cockpit-grid">
+
+    <!-- Left: Telemetry & Soundboard -->
+    <div class="telemetry-column">
+      <div class="hud-panel">
+        <div class="car-hero-header">
+          <div>
+            <h1 class="car-title" id="activeCarName">Porsche 911 GT3 RS</h1>
+            <div class="car-engine-badge" id="activeCarEngine">4.0L Naturally Aspirated Boxer-6</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">СУТОЧНЫЙ ТАРИФ</div>
+            <div style="font-family: 'Orbitron'; font-size: 1.6rem; font-weight: 900; color: #fff;" id="activeDailyRate">65 000 ₽</div>
+          </div>
+        </div>
+
+        <!-- Gauges Row: Tachometer + Rev Soundboard -->
+        <div class="gauges-row">
+          <!-- SVG Tachometer -->
+          <div class="tachometer-wrapper">
+            <svg viewBox="0 0 260 260" width="260" height="260">
+              <!-- Background Circle -->
+              <circle cx="130" cy="130" r="115" fill="#08090C" stroke="#222" stroke-width="4" />
+              <!-- Tacho Arc: -220 deg to 40 deg -->
+              <circle cx="130" cy="130" r="100" fill="none" stroke="#333" stroke-width="8" stroke-dasharray="470" stroke-dashoffset="120" stroke-linecap="round" />
+              <!-- Redline Arc: 7000 to 9000 RPM -->
+              <circle cx="130" cy="130" r="100" fill="none" stroke="#FF1801" stroke-width="9" stroke-dasharray="100" stroke-dashoffset="-240" />
+              
+              <!-- Center Hub -->
+              <circle cx="130" cy="130" r="18" fill="#1C1E24" stroke="#FF1801" stroke-width="2" />
+              <text x="130" y="180" font-family="'Orbitron'" font-size="12" fill="#838A9A" text-anchor="middle">RPM x 1000</text>
+              <text x="130" y="205" font-family="'Orbitron'" font-size="16" font-weight="900" fill="#FFF" text-anchor="middle" id="liveRpmValue">850</text>
+
+              <!-- Needle -->
+              <g id="needleGroup" class="rev-needle" style="transform: rotate(-120deg);">
+                <line x1="130" y1="130" x2="130" y2="40" stroke="#FF1801" stroke-width="3.5" stroke-linecap="round" />
+                <circle cx="130" cy="130" r="6" fill="#FFF" />
+              </g>
+            </svg>
+          </div>
+
+          <!-- Rev Button & Soundboard Details -->
+          <div class="rev-button-container">
+            <button class="btn-rev" id="btnRevEngine" onmousedown="startEngineRev()" onmouseup="stopEngineRev()" ontouchstart="startEngineRev()" ontouchend="stopEngineRev()">
+              🔥 ЗАПУСТИТЬ ВЫХЛОП (REV)
+            </button>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+              Удерживайте кнопку для набора максимальных оборотов и перегазовки с отстрелами выхлопной системы.
+            </p>
+          </div>
+        </div>
+
+        <!-- Dyno Telemetry Metrics -->
+        <div class="dyno-metrics-grid">
+          <div class="dyno-card">
+            <div class="dyno-label">Разгон 0–100</div>
+            <div class="dyno-value" id="specAccel">3.2 <span>сек</span></div>
+          </div>
+          <div class="dyno-card">
+            <div class="dyno-label">Мощность</div>
+            <div class="dyno-value" id="specHp">525 <span>л.с.</span></div>
+          </div>
+          <div class="dyno-card">
+            <div class="dyno-label">Крутящий момент</div>
+            <div class="dyno-value" id="specTorque">465 <span>Нм</span></div>
+          </div>
+          <div class="dyno-card">
+            <div class="dyno-label">Макс. скорость</div>
+            <div class="dyno-value" id="specTopSpeed">296 <span>км/ч</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Calculator & Reservation -->
+    <aside class="calc-panel">
+      <div class="calc-title">
+        <span>⏱</span> Расчет аренды и депозита
+      </div>
+
+      <div class="form-group">
+        <label>Дата начала аренды</label>
+        <input type="date" id="inputStartDate" onchange="recalculateQuote()">
+      </div>
+
+      <div class="form-group">
+        <label>Дата окончания аренды</label>
+        <input type="date" id="inputEndDate" onchange="recalculateQuote()">
+      </div>
+
+      <div class="form-group">
+        <label>Возраст водителя (от 21 года)</label>
+        <input type="number" id="inputDriverAge" value="26" min="21" max="80" onchange="recalculateQuote()">
+      </div>
+
+      <div class="form-group">
+        <label>Пакет суточного пробега</label>
+        <select id="selectMileage" onchange="recalculateQuote()">
+          <option value="200km">200 км / день (включено)</option>
+          <option value="400km">400 км / день (+10 000 ₽/день)</option>
+          <option value="unlimited">Безлимит / Трек-день (+25 000 ₽/день)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Страховой пакет</label>
+        <select id="selectInsurance" onchange="recalculateQuote()">
+          <option value="standard">Standard Shield (полный залог)</option>
+          <option value="vip_shield">VIP Shield (+15 000 ₽/день, залог -50%)</option>
+        </select>
+      </div>
+
+      <!-- Live Summary -->
+      <div class="summary-box">
+        <div class="summary-row">
+          <span>Срок аренды:</span>
+          <span id="sumDays">1 день</span>
+        </div>
+        <div class="summary-row">
+          <span>Тариф в сутки:</span>
+          <span id="sumDaily">65 000 ₽</span>
+        </div>
+        <div class="summary-row">
+          <span>Страховой депозит (возвратный):</span>
+          <span id="sumDeposit" style="color: var(--telemetry-green);">150 000 ₽</span>
+        </div>
+        <div class="summary-row total">
+          <span>ИТОГО К ОПЛАТЕ:</span>
+          <span id="sumTotal" style="color: #fff;">65 000 ₽</span>
+        </div>
+      </div>
+
+      <button class="btn-rent" onclick="openBookingPrompt()">
+        Забронировать суперкар
+      </button>
+    </aside>
+
+  </main>
+
+  <script>
+    let fleet = [];
+    let currentCar = null;
+    let audioCtx = null;
+    let engineOsc = null;
+    let revInterval = null;
+    let currentRpm = 850;
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      document.getElementById("inputStartDate").value = today.toISOString().split("T")[0];
+      document.getElementById("inputEndDate").value = tomorrow.toISOString().split("T")[0];
+
+      fetchFleet();
+    });
+
+    async function fetchFleet() {
+      try {
+        const res = await fetch("/api/cars");
+        const data = await res.json();
+        fleet = data.fleet;
+        renderFleetTabs(fleet);
+        if (fleet.length > 0) {
+          selectCar(fleet[0]);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderFleetTabs(cars) {
+      const tabs = document.getElementById("fleetTabs");
+      tabs.innerHTML = cars.map(c => `
+        <button class="car-tab-btn ${currentCar && currentCar.id === c.id ? 'active' : ''}" onclick="selectCarBySlug('${c.slug}')">
+          ${c.name}
+        </button>
+      `).join("");
+    }
+
+    function selectCarBySlug(slug) {
+      const car = fleet.find(c => c.slug === slug);
+      if (car) selectCar(car);
+    }
+
+    function selectCar(car) {
+      currentCar = car;
+      renderFleetTabs(fleet);
+
+      document.getElementById("activeCarName").textContent = car.name;
+      document.getElementById("activeCarEngine").textContent = car.engine;
+      document.getElementById("activeDailyRate").textContent = `${car.daily_rate_rub.toLocaleString()} ₽`;
+      document.getElementById("specAccel").innerHTML = `${car.accel_0_100} <span>сек</span>`;
+      document.getElementById("specHp").innerHTML = `${car.horsepower} <span>л.с.</span>`;
+      document.getElementById("specTorque").innerHTML = `${car.torque_nm} <span>Нм</span>`;
+      document.getElementById("specTopSpeed").innerHTML = `${car.top_speed_kmh} <span>км/ч</span>`;
+
+      recalculateQuote();
+    }
+
+    async function recalculateQuote() {
+      if (!currentCar) return;
+
+      const startDate = document.getElementById("inputStartDate").value;
+      const endDate = document.getElementById("inputEndDate").value;
+      const age = parseInt(document.getElementById("inputDriverAge").value) || 25;
+      const mileage = document.getElementById("selectMileage").value;
+      const insurance = document.getElementById("selectInsurance").value;
+
+      try {
+        const res = await fetch("/api/calculate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            car_id: currentCar.id,
+            start_date: startDate,
+            end_date: endDate,
+            driver_age: age,
+            mileage_package: mileage,
+            insurance_tier: insurance
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const q = data.quote;
+          document.getElementById("sumDays").textContent = `${q.rental_days} дн.`;
+          document.getElementById("sumDaily").textContent = `${q.adjusted_daily_rate.toLocaleString()} ₽`;
+          document.getElementById("sumDeposit").textContent = `${q.deposit_rub.toLocaleString()} ₽`;
+          document.getElementById("sumTotal").textContent = `${q.total_rent_rub.toLocaleString()} ₽`;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Web Audio Synthesizer for Engine Rev & Exhaust Pops
+    function startEngineRev() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      const baseFreq = currentCar ? currentCar.sound_frequency : 180;
+      engineOsc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      engineOsc.type = "sawtooth";
+      engineOsc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+
+      // Ramp up RPM & pitch
+      engineOsc.frequency.exponentialRampToValueAtTime(baseFreq * 3.5, audioCtx.currentTime + 1.2);
+
+      gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.35, audioCtx.currentTime + 1.2);
+
+      engineOsc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      engineOsc.start();
+
+      // Animate needle on tachometer up to 8500 RPM
+      clearInterval(revInterval);
+      revInterval = setInterval(() => {
+        if (currentRpm < 8500) {
+          currentRpm += 350;
+          updateTachoVisuals(currentRpm);
+        }
+      }, 30);
+    }
+
+    function stopEngineRev() {
+      if (engineOsc) {
+        try {
+          // Play exhaust backfire pop
+          playBackfirePop();
+          engineOsc.stop(audioCtx.currentTime + 0.3);
+        } catch(e) {}
+        engineOsc = null;
+      }
+
+      // Idle down
+      clearInterval(revInterval);
+      revInterval = setInterval(() => {
+        if (currentRpm > 850) {
+          currentRpm -= 250;
+          updateTachoVisuals(currentRpm);
+        } else {
+          currentRpm = 850;
+          updateTachoVisuals(currentRpm);
+          clearInterval(revInterval);
+        }
+      }, 20);
+    }
+
+    function updateTachoVisuals(rpm) {
+      document.getElementById("liveRpmValue").textContent = rpm;
+      // -120 deg (idle 850) to +65 deg (9000 RPM)
+      const deg = -120 + ((rpm - 850) / (9000 - 850)) * 185;
+      document.getElementById("needleGroup").style.transform = `rotate(${deg}deg)`;
+    }
+
+    function playBackfirePop() {
+      if (!audioCtx) return;
+      const bufferSize = audioCtx.sampleRate * 0.15;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.03));
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.4;
+      noise.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start();
+    }
+
+    async function openBookingPrompt() {
+      const name = prompt("Имя водителя:");
+      if (!name) return;
+      const phone = prompt("Телефон или Telegram для бронирования:");
+      if (!phone) return;
+
+      const startDate = document.getElementById("inputStartDate").value;
+      const endDate = document.getElementById("inputEndDate").value;
+      const age = parseInt(document.getElementById("inputDriverAge").value) || 25;
+      const mileage = document.getElementById("selectMileage").value;
+      const insurance = document.getElementById("selectInsurance").value;
+
+      try {
+        const res = await fetch("/api/rentals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            car_id: currentCar.id,
+            client_name: name,
+            phone: phone,
+            driver_age: age,
+            start_date: startDate,
+            end_date: endDate,
+            mileage_package: mileage,
+            insurance_tier: insurance
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          alert(`🏁 ${data.message}\nСуперкар: ${currentCar.name}\nСумма аренды: ${data.quote.total_rent_rub} ₽`);
+        } else {
+          alert(`Ошибка: ${data.detail}`);
+        }
+      } catch (err) {
+        alert("Ошибка сети при отправке брони");
+      }
+    }
+  </script>
+</body>
+</html>
